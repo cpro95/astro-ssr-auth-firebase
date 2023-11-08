@@ -1,0 +1,55 @@
+---
+import BaseLayout from "@layouts/BaseLayout.astro";
+import { TOKEN } from "@constants/cookies";
+import { serverApp } from "@scripts/firebase/initServer";
+import { getAuth } from "firebase-admin/auth";
+
+const url = new URL(Astro.request.url);
+const urlTokenParam = url.searchParams.get("token");
+
+const cookieToken = Astro.cookies.get(TOKEN);
+const token = urlTokenParam || cookieToken?.value;
+
+if (!token) {
+  return Astro.redirect("/signin");
+}
+
+const auth = getAuth(serverApp);
+
+try {
+  await auth.verifyIdToken(token);
+
+  Astro.cookies.set(TOKEN, token, {
+    path: "/",
+    secure: true,
+    httpOnly: true,
+  });
+} catch (error) {
+  console.error("Could not decode token", {
+    fromCookie: !!cookieToken?.value,
+    fromUrl: !!urlTokenParam,
+  });
+
+  return Astro.redirect("/signin");
+}
+---
+
+<BaseLayout isPrivatePage>
+  <a href="/signin" class="flex items-center mb-6 text-gray-900 dark:text-white"
+    >sign in</a
+  >
+  <a href="/signup" class="flex items-center mb-6 text-gray-900 dark:text-white"
+    >sign up</a
+  >
+</BaseLayout>
+<script>
+  // Enhancement: remove token from URL after page's parsed.
+  const url = new URL(window.location.href);
+  const urlTokenParam = url.searchParams.get("token");
+
+  if (urlTokenParam) {
+    url.searchParams.delete("token");
+
+    window.history.pushState({}, "", url.href);
+  }
+</script>
